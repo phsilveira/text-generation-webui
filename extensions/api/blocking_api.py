@@ -203,7 +203,7 @@ class Handler(BaseHTTPRequestHandler):
                 }]
             })
 
-            logger.debug(f"Chat reply generated for input: {user_input}")
+            logger.debug(f"Chat reply generated for input: {user_input}: {response.encode('utf-8')}")
             self.wfile.write(response.encode('utf-8'))
 
         elif self.path == '/api/v1/stop-stream':
