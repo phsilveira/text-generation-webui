@@ -1,12 +1,12 @@
 # Copied from https://stackoverflow.com/a/1336640
 
 import logging
+from logging.handlers import RotatingFileHandler
 import platform
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)s:%(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    filename='app.log'
 )
 
 
@@ -116,3 +116,16 @@ else:
 
 logger = logging.getLogger('text-generation-webui')
 logger.setLevel(logging.DEBUG)
+
+# Create the rotating file handler
+handler = RotatingFileHandler('app.log', maxBytes=1e6, backupCount=3)  # 1e6 = 1MB
+
+# Set up the formatter using your existing format and datefmt
+formatter = logging.Formatter(
+    fmt='%(asctime)s %(levelname)s:%(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+handler.setFormatter(formatter)
+
+# Add the handler to the logger
+logger.addHandler(handler)
