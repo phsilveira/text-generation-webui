@@ -18,6 +18,7 @@ from modules.text_generation import (
 )
 from modules.utils import get_available_models, get_available_characters
 from modules.chat import save_character
+from modules.logging_colors import logger
 
 
 def get_model_info():
@@ -29,9 +30,10 @@ def get_model_info():
         'shared.args': vars(shared.args),
     }
 
-
 class Handler(BaseHTTPRequestHandler):
+
     def simple_json_results(self, resp):
+        logger.debug("Preparing simple JSON results response")
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
@@ -44,18 +46,22 @@ class Handler(BaseHTTPRequestHandler):
 
     def auth(self):
         if 'Authorization' not in self.headers:
+            logger.warning("Authorization header missing")
             self.send_error(401)
             return
 
         auth_header = self.headers.get('Authorization')
+        logger.debug(f"Received Authorization header: {auth_header}")
         token = auth_header.replace('Bearer ', '')
 
         if token != shared.args.auth_api_token:
+            logger.warning("Invalid auth token provided")
             self.send_error(401)
             return
 
     def do_GET(self):
-
+        logger.info(f"Received GET request for path: {self.path}")
+        
         if shared.args.auth_api:
             self.auth()
 
@@ -65,20 +71,23 @@ class Handler(BaseHTTPRequestHandler):
             response = json.dumps({
                 'result': shared.model_name
             })
-
+            logger.debug(f"Response prepared: {response}")
             self.wfile.write(response.encode('utf-8'))
             
         elif self.path.startswith('/api/v1/characters'):
+            logger.debug("Fetching available characters")
             self.simple_json_results(get_available_characters()[1:])
         else:
+            logger.warning(f"Invalid path: {self.path}")
             self.send_error(404)
 
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
         try:
             body = json.loads(self.rfile.read(content_length).decode('utf-8'))
+            logger.debug(f"Received POST body: {body}")
         except Exception as e:
-            print(e)
+            logger.error(f"Error parsing POST body: {e}")
             self.send_error(400)
             return
 
@@ -108,9 +117,11 @@ class Handler(BaseHTTPRequestHandler):
                 }]
             })
 
+            logger.debug(f"Response prepared: {response}")
             self.wfile.write(response.encode('utf-8'))
 
         elif self.path == '/api/v1/character':
+            logger.debug("Processing POST for single character addition")
             self.send_response(201)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
@@ -129,20 +140,24 @@ class Handler(BaseHTTPRequestHandler):
                 }]
             })
 
+            logger.debug(f"Saved character: {name}")
             self.wfile.write(response.encode('utf-8'))
 
         elif self.path == '/api/v1/characters':
+            logger.debug("Processing POST for batch character addition")
             self.send_response(201)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
 
             if body is None:
+                logger.warning("Body is missing for batch character addition")
                 self.simple_json_results("body is None")
                 return
 
             characters = get_available_characters()
             for character in characters:
                 delete_character(character)
+                logger.debug(f"Deleted character: {character}")
 
             for character in body:
                 try:
@@ -153,15 +168,17 @@ class Handler(BaseHTTPRequestHandler):
                     context += f"\n{example_dialogue.strip()}\n"
 
                     save_character(name, greeting, context, None, name)
+                    logger.debug(f"Saved character: {name}")
                 except Exception as e:
-                    print(e)
+                    logger.error(f"Error saving character: {e}")
             
             response = json.dumps({
                 'results': get_available_characters()[1:],
             })
             self.wfile.write(response.encode('utf-8'))
-        
+
         elif self.path == '/api/v1/chat':
+            logger.debug("Processing POST for chat interaction")
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
@@ -186,9 +203,11 @@ class Handler(BaseHTTPRequestHandler):
                 }]
             })
 
+            logger.debug(f"Chat reply generated for input: {user_input}")
             self.wfile.write(response.encode('utf-8'))
 
         elif self.path == '/api/v1/stop-stream':
+            logger.debug("Processing POST to stop stream")
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
@@ -199,6 +218,7 @@ class Handler(BaseHTTPRequestHandler):
                 'results': 'success'
             })
 
+            logger.debug("Stream stopped successfully")
             self.wfile.write(response.encode('utf-8'))
 
         elif self.path == '/api/v1/model':
@@ -304,7 +324,7 @@ def _run_server(port: int, share: bool = False):
         except Exception:
             pass
     else:
-        print(f'Starting API at http://{address}:{port}/api')
+        print(f'Starting API at http://{address}:{port}/api')        
     
     if shared.args.auth_api:
         print(f'with token {shared.args.auth_api_token}')
